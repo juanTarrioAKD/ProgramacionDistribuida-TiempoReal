@@ -1,0 +1,14 @@
+# Archivos objeto intermedios
+*.o
+*.out
+
+# Ejecutables específicos de tus TPs
+servidor
+cliente
+servidor_sin_listen
+servidor_sin_accept
+cliente_test
+
+# Si tienes carpetas donde dejas los binarios compilados (opcional)
+bin/
+build/
