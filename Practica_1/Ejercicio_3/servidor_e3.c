@@ -19,6 +19,8 @@ int main(int argc, char *argv[]) {
 
     int portno = atoi(argv[1]); // Corregido: argv[1]
     int sockfd = socket(AF_INET, SOCK_STREAM, 0);
+    
+
     if (sockfd < 0) error("Error al abrir socket");
 
     struct sockaddr_in serv_addr, cli_addr;
@@ -37,7 +39,7 @@ int main(int argc, char *argv[]) {
     int newsockfd = accept(sockfd, (struct sockaddr *) &cli_addr, &clilen);
     if (newsockfd < 0) error("Error en accept");
 
-    // Procesamos las 6 pruebas de tamaño (10^1 a 10^6)
+    // Procesamos las 6 pruebas de tamanio (10^1 a 10^6)
     int tamanios[] = {10, 100, 1000, 10000, 100000, 1000000};
     
     for (int i = 0; i < 6; i++) {
@@ -50,14 +52,14 @@ int main(int argc, char *argv[]) {
         while (total_recibido < tamano_esperado) {
             int n = read(newsockfd, buffer + total_recibido, tamano_esperado - total_recibido);
             if (n < 0) error("Error leyendo del socket");
-            if (n == 0) break; // El cliente cerró la conexión inesperadamente
+            if (n == 0) break; // El cliente cerro la conexion inesperadamente
             total_recibido += n;
         }
 
-        // VERIFICACIÓN sin imprimir el buffer completo
+        // VERIFICACION sin imprimir el buffer completo
         int datos_correctos = 1;
         for (int j = 0; j < total_recibido; j++) {
-            if (buffer[j] != 'A') { // Esperamos que todos los bytes sean el carácter 'A'
+            if (buffer[j] != 'A') { // Esperamos que todos los bytes sean el caracter 'A'
                 datos_correctos = 0;
                 break;
             }
