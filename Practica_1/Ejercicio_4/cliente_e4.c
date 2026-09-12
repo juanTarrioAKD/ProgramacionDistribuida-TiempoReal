@@ -1,7 +1,11 @@
+#define _POSIX_C_SOURCE 199309L
+#define _DEFAULT_SOURCE
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <time.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -13,63 +17,66 @@ void error(const char *msg) {
 }
 
 int main(int argc, char *argv[]) {
-    if (argc < 3) {
-        fprintf(stderr, "Uso: %s <host> <puerto>\n", argv[0]);
+    if (argc < 4) {
+        fprintf(stderr, "Uso: %s <host_IP> <puerto> <tamano_buffer>\n", argv[0]);
         exit(1);
     }
 
     int portno = atoi(argv[2]);
+    int tam_buffer = atoi(argv[3]); // Tamaño del búfer pasado por parámetro
+
     int sockfd = socket(AF_INET, SOCK_STREAM, 0);
     if (sockfd < 0) error("Error abriendo socket");
 
     struct hostent *server = gethostbyname(argv[1]);
     if (server == NULL) {
-        fprintf(stderr, "ERROR, no existe el host %s\n", argv[4]);
-        exit(0);
+        fprintf(stderr, "Error, no existe el host %s\n", argv[1]);
+        exit(1);
     }
 
     struct sockaddr_in serv_addr;
-    bzero((char *) &serv_addr, sizeof(serv_addr));
+    memset(&serv_addr, 0, sizeof(serv_addr));
     serv_addr.sin_family = AF_INET;
-    bcopy((char *)server->h_addr, (char *)&serv_addr.sin_addr.s_addr, server->h_length);
+    memcpy(&serv_addr.sin_addr.s_addr, server->h_addr_list[0], server->h_length);
     serv_addr.sin_port = htons(portno);
-               
 
     if (connect(sockfd, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) < 0)
         error("Error conectando");
 
-    // Tamaños a probar: 10^1 a 10^6 bytes
-    int tamanios[] = {10, 100, 1000, 10000, 100000, 1000000};
+    char *buffer = (char *) malloc(tam_buffer);
+    if (buffer == NULL) error("Error al reservar memoria");
+    memset(buffer, 'A', tam_buffer);
 
-    for (int i = 0; i < 6; i++) {
-        int tamano = tamanios[i];
-        
-        // Asignación directa en memoria e inicialización con datos patron
-        char *buffer = (char *) malloc(tamano);
-        if (buffer == NULL) error("Error al reservar memoria");
-        memset(buffer, 'A', tamano); // Llenamos el buffer con el carácter 'A'
+    struct timespec t0_write, t1_write;
+    clock_gettime(CLOCK_MONOTONIC, &t0_write);
 
-        int total_enviado = 0;
-        // CALCULO DE TIEMPOS
-        struct timespec t0, t1;
-        clock_gettime(CLOCK_MONOTONIC, &t0); 
+    // UNA ÚNICA LLAMADA A WRITE (SIN BUCLE WHILE)
+    int bytes_enviados = write(sockfd, buffer, tam_buffer);
 
-        // Bucle para controlar ESCRITURAS PARCIALES
-        while (total_enviado < tamano) {
-            int n = write(sockfd, buffer + total_enviado, tamano - total_enviado);
-            if (n < 0) error("Error escribiendo en socket");
-            total_enviado += n;
-        }
+    clock_gettime(CLOCK_MONOTONIC, &t1_write);
+    double tiempo_write = (t1_write.tv_sec - t0_write.tv_sec) + (t1_write.tv_nsec - t0_write.tv_nsec) / 1e9;
 
-        // CALCULO DE DIFERENCIA DE TIEMPOS
-        clock_gettime(CLOCK_MONOTONIC, &t1);
-        double tiempo_write = (t1.tv_sec - t0.tv_sec) + (t1.tv_nsec - t0.tv_nsec) / 1e9; // en segundos
+    // Recepción del ACK
+    struct timespec t0_read, t1_read;
+    clock_gettime(CLOCK_MONOTONIC, &t0_read);
+    char ack;
+    read(sockfd, &ack, 1);
+    clock_gettime(CLOCK_MONOTONIC, &t1_read);
+    double tiempo_read = (t1_read.tv_sec - t0_read.tv_sec) + (t1_read.tv_nsec - t0_read.tv_nsec) / 1e9;
 
-        printf("[CLIENTE] Enviados exitosamente %d bytes (10^%d).\n", total_enviado, i + 1, "TOTAL DE TIEMPO DE ENVIO(write) EN SEGUNDOS:", tiempo_write);
-        free(buffer);
-        usleep(100000); // Pausa de 100ms entre envíos
+    printf("\n=== RESULTADO CLIENTE (SIN WHILE) ===\n");
+    printf("Tamaño de búfer solicitado a enviar: %d bytes\n", tam_buffer);
+    printf("Bytes efectivamente entregados por write(): %d bytes\n", bytes_enviados);
+    printf("Tiempo de write(): %.6f segundos\n", tiempo_write);
+    printf("Tiempo de read() (ACK): %.6f segundos\n", tiempo_read);
+
+    if (bytes_enviados < tam_buffer) {
+        printf("[¡ATENCIÓN!] ESCRITURA PARCIAL: Solo se enviaron %d de %d bytes.\n", bytes_enviados, tam_buffer);
+    } else {
+        printf("[OK] Se entregaron todos los bytes a la red en una sola llamada.\n");
     }
 
+    free(buffer);
     close(sockfd);
     return 0;
 }

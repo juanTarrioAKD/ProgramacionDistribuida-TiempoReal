@@ -1,8 +1,12 @@
+#define _POSIX_C_SOURCE 199309L
+#define _DEFAULT_SOURCE
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-#include <sys/types.h> 
+#include <time.h>
+#include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 
@@ -12,19 +16,22 @@ void error(const char *msg) {
 }
 
 int main(int argc, char *argv[]) {
-    if (argc < 2) {
-        fprintf(stderr, "Uso: %s <puerto>\n", argv[0]); // Corregido: argv[0]
+    if (argc < 3) {
+        fprintf(stderr, "Uso: %s <puerto> <tamano_buffer>\n", argv[0]);
         exit(1);
     }
 
-    int portno = atoi(argv[1]); // Corregido: argv[1]
-    int sockfd = socket(AF_INET, SOCK_STREAM, 0);
-    
+    int portno = atoi(argv[1]);
+    int tam_buffer = atoi(argv[2]); // Tamaño del búfer pasado por parámetro
 
+    int sockfd = socket(AF_INET, SOCK_STREAM, 0);
     if (sockfd < 0) error("Error al abrir socket");
 
+    int optval = 1;
+    setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval));
+
     struct sockaddr_in serv_addr, cli_addr;
-    bzero((char *) &serv_addr, sizeof(serv_addr));
+    memset(&serv_addr, 0, sizeof(serv_addr));
     serv_addr.sin_family = AF_INET;
     serv_addr.sin_addr.s_addr = INADDR_ANY;
     serv_addr.sin_port = htons(portno);
@@ -33,55 +40,40 @@ int main(int argc, char *argv[]) {
         error("Error en bind");
 
     listen(sockfd, 5);
-    printf("[SERVIDOR] Escuchando en el puerto %d...\n", portno);
+    printf("[SERVIDOR - VM A] Escuchando en el puerto %d (Buffer configurado: %d bytes)...\n", portno, tam_buffer);
 
     socklen_t clilen = sizeof(cli_addr);
     int newsockfd = accept(sockfd, (struct sockaddr *) &cli_addr, &clilen);
     if (newsockfd < 0) error("Error en accept");
 
-    // Procesamos las 6 pruebas de tamanio (10^1 a 10^6)
-    int tamanios[] = {10, 100, 1000, 10000, 100000, 1000000};
-    
-    for (int i = 0; i < 6; i++) {
-        int tamano_esperado = tamanios[i];
-        char *buffer = (char *) malloc(tamano_esperado);
-        if (buffer == NULL) error("Error al reservar memoria en servidor");
+    char *buffer = (char *) malloc(tam_buffer);
+    if (buffer == NULL) error("Error al reservar memoria");
 
-        int total_recibido = 0;
-        // CALCULO DE TIEMPOS
-        struct timespec t0, t1;
-        clock_gettime(CLOCK_MONOTONIC, &t0); 
+    struct timespec t0_read, t1_read;
+    clock_gettime(CLOCK_MONOTONIC, &t0_read);
 
-        // Bucle para controlar LECTURAS PARCIALES
-        while (total_recibido < tamano_esperado) {
-            int n = read(newsockfd, buffer + total_recibido, tamano_esperado - total_recibido);
-            if (n < 0) error("Error leyendo del socket");
-            if (n == 0) break; // El cliente cerro la conexion inesperadamente
-            total_recibido += n;
-        }
+    // UNA ÚNICA LLAMADA A READ (SIN BUCLE WHILE)
+    int bytes_leidos = read(newsockfd, buffer, tam_buffer);
 
-        // CALCULO DE DIFERENCIA DE TIEMPOS
-        clock_gettime(CLOCK_MONOTONIC, &t1);
-        double tiempo_read = (t1.tv_sec - t0.tv_sec) + (t1.tv_nsec - t0.tv_nsec) / 1e9; // en segundos
+    clock_gettime(CLOCK_MONOTONIC, &t1_read);
+    double tiempo_read = (t1_read.tv_sec - t0_read.tv_sec) + (t1_read.tv_nsec - t0_read.tv_nsec) / 1e9;
 
-        // VERIFICACION sin imprimir el buffer completo
-        int datos_correctos = 1;
-        for (int j = 0; j < total_recibido; j++) {
-            if (buffer[j] != 'A') { // Esperamos que todos los bytes sean el caracter 'A'
-                datos_correctos = 0;
-                break;
-            }
-        }
+    printf("\n=== RESULTADO SERVIDOR (SIN WHILE) ===\n");
+    printf("Tamaño de búfer esperado: %d bytes\n", tam_buffer);
+    printf("Bytes efectivamente leídos en 1 sola llamada a read(): %d bytes\n", bytes_leidos);
+    printf("Tiempo de read(): %.6f segundos\n", tiempo_read);
 
-        if (total_recibido == tamano_esperado && datos_correctos) {
-            printf("[SERVIDOR] [OK] Recibidos correctamente %d bytes (10^%d).\n", total_recibido, i + 1, "TOTAL DE TIEMPO DE ENVIO(write) EN SEGUNDOS:", tiempo_write);
-        } else {
-            printf("[SERVIDOR] [ERROR] Falla en prueba de %d bytes. Recibidos: %d\n", tamano_esperado, total_recibido);
-        }
-
-        free(buffer);
+    if (bytes_leidos < tam_buffer) {
+        printf("[¡ATENCIÓN!] SE PRODUJO LECTURA PARCIAL: Se dejaron de leer %d bytes (%d recibidos de %d esperados).\n", 
+               tam_buffer - bytes_leidos, bytes_leidos, tam_buffer);
+    } else {
+        printf("[OK] Se leyó la totalidad del búfer en una sola llamada.\n");
     }
 
+    // Confirmación (ACK) enviada al cliente
+    write(newsockfd, "K", 1);
+
+    free(buffer);
     close(newsockfd);
     close(sockfd);
     return 0;
