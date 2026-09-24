@@ -1,3 +1,6 @@
+# Estado local de Vagrant
+.vagrant/
+
 # Archivos objeto intermedios
 *.o
 *.out
