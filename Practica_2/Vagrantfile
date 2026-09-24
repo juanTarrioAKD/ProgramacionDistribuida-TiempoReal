@@ -4,7 +4,7 @@ Vagrant.configure("2") do |config|
   ("a".."b").each_with_index do |id, i|
     config.vm.define "vm#{id}" do |machine|
       machine.vm.box         = "ubuntu/jammy64"
-      machine.vm.box_version = "20240821.0.1"   # ajustar al que te baje
+      machine.vm.box_version = "20241002.0.0"
       machine.vm.box_check_update = false
       machine.vm.hostname    = "vm#{id}"
 
