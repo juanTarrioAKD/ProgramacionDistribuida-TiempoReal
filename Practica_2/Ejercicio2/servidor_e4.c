@@ -10,19 +10,29 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 
+/* Estas dos constantes DEBEN coincidir con las del cliente.
+   Si cambias una, cambia la otra o los programas se desincronizan. */
+#define REPETICIONES   100
+#define CALENTAMIENTO    5
+
 void error(const char *msg) {
     perror(msg);
     exit(1);
 }
 
 int main(int argc, char *argv[]) {
-    if (argc < 3) {
-        fprintf(stderr, "Uso: %s <puerto> <tamano_buffer>\n", argv[0]);
+    if (argc < 2) {
+        fprintf(stderr, "Uso: %s <puerto>\n", argv[0]);
         exit(1);
     }
 
+    /* Arreglo IDENTICO y en el mismo orden que el del cliente: asi ambos
+       saben cuantos bytes corresponden a cada vuelta sin necesidad de
+       negociar nada por la red. */
+    const int tamanos[] = {10, 100, 1000, 10000, 100000, 1000000};
+    const int num_tamanos = 6;
+
     int portno = atoi(argv[1]);
-    int tam_buffer = atoi(argv[2]); // Tamaño del búfer pasado por parámetro
 
     int sockfd = socket(AF_INET, SOCK_STREAM, 0);
     if (sockfd < 0) error("Error al abrir socket");
@@ -40,38 +50,60 @@ int main(int argc, char *argv[]) {
         error("Error en bind");
 
     listen(sockfd, 5);
-    printf("[SERVIDOR - VM A] Escuchando en el puerto %d (Buffer configurado: %d bytes)...\n", portno, tam_buffer);
+    printf("[SERVIDOR] Escuchando en el puerto %d...\n", portno);
+    fflush(stdout);
 
+    /* El accept() queda FUERA de los bucles: una sola conexion atiende
+       los seis tamanios completos. */
     socklen_t clilen = sizeof(cli_addr);
     int newsockfd = accept(sockfd, (struct sockaddr *) &cli_addr, &clilen);
     if (newsockfd < 0) error("Error en accept");
 
-    char *buffer = (char *) malloc(tam_buffer);
+    printf("[SERVIDOR] Cliente conectado. Iniciando experimento.\n");
+    printf("[SERVIDOR] %d repeticiones por tamanio (+%d de calentamiento).\n\n",
+           REPETICIONES, CALENTAMIENTO);
+    fflush(stdout);
+
+    /* Buffer reservado UNA sola vez, del tamanio mayor */
+    int max_tam = tamanos[num_tamanos - 1];
+    char *buffer = (char *) malloc(max_tam);
     if (buffer == NULL) error("Error al reservar memoria");
 
-    struct timespec t0_read, t1_read;
-    clock_gettime(CLOCK_MONOTONIC, &t0_read);
+    for (int i_tam = 0; i_tam < num_tamanos; i_tam++) {
+        int tam_buffer = tamanos[i_tam];
 
-    // UNA ÚNICA LLAMADA A READ (SIN BUCLE WHILE)
-    int bytes_leidos = read(newsockfd, buffer, tam_buffer);
+        for (int iter = 0; iter < CALENTAMIENTO + REPETICIONES; iter++) {
 
-    clock_gettime(CLOCK_MONOTONIC, &t1_read);
-    double tiempo_read = (t1_read.tv_sec - t0_read.tv_sec) + (t1_read.tv_nsec - t0_read.tv_nsec) / 1e9;
+            /* read() devuelve "lo que haya disponible", no necesariamente
+               todo lo pedido. Con 10^5 y 10^6 bytes es practicamente seguro
+               que haga falta insistir, asi que se lee en bucle hasta juntar
+               los tam_buffer bytes. Sin esto el protocolo se desfasa en la
+               vuelta siguiente. */
+            int bytes_leidos = 0;
+            while (bytes_leidos < tam_buffer) {
+                int n = read(newsockfd, buffer + bytes_leidos,
+                             tam_buffer - bytes_leidos);
+                if (n < 0) error("Error en read");
+                if (n == 0) {
+                    fprintf(stderr,
+                            "[SERVIDOR] El cliente cerro la conexion "
+                            "(tamanio %d, iteracion %d)\n", tam_buffer, iter);
+                    exit(1);
+                }
+                bytes_leidos += n;
+            }
 
-    printf("\n=== RESULTADO SERVIDOR (SIN WHILE) ===\n");
-    printf("Tamaño de búfer esperado: %d bytes\n", tam_buffer);
-    printf("Bytes efectivamente leídos en 1 sola llamada a read(): %d bytes\n", bytes_leidos);
-    printf("Tiempo de read(): %.6f segundos\n", tiempo_read);
+            /* Confirmacion de tamanio fijo: es lo que el cliente cronometra
+               en el punto b). Siempre un byte, sin importar cuanto recibio. */
+            if (write(newsockfd, "K", 1) < 0) error("Error enviando la confirmacion");
+        }
 
-    if (bytes_leidos < tam_buffer) {
-        printf("[¡ATENCIÓN!] SE PRODUJO LECTURA PARCIAL: Se dejaron de leer %d bytes (%d recibidos de %d esperados).\n", 
-               tam_buffer - bytes_leidos, bytes_leidos, tam_buffer);
-    } else {
-        printf("[OK] Se leyó la totalidad del búfer en una sola llamada.\n");
+        printf("[SERVIDOR] Tamanio %7d bytes: %d intercambios completados.\n",
+               tam_buffer, CALENTAMIENTO + REPETICIONES);
+        fflush(stdout);
     }
 
-    // Confirmación (ACK) enviada al cliente
-    write(newsockfd, "K", 1);
+    printf("\n[SERVIDOR] Experimento finalizado.\n");
 
     free(buffer);
     close(newsockfd);

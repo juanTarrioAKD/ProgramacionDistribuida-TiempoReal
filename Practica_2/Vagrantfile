@@ -12,6 +12,10 @@ Vagrant.configure("2") do |config|
       # El host queda en 192.168.56.1 (escenario 4b)
       machine.vm.network "private_network", ip: "192.168.56.#{10 + i}"
 
+      # Adaptador 3 - bridged: ejercicios 2 y 3 (dos computadoras físicas).
+      # La VM pide IP por DHCP al router y aparece en la LAN real.
+      machine.vm.network "public_network"
+
       machine.vm.provider "virtualbox" do |vb|
         vb.name   = "TP2-vm#{id}"
         vb.memory = "1024"
