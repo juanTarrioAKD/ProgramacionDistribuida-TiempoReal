@@ -1,0 +1,12 @@
+[SERVIDOR] Escuchando en el puerto 5000...
+[SERVIDOR] Cliente conectado. Iniciando experimento.
+[SERVIDOR] 100 repeticiones por tamanio (+5 de calentamiento).
+
+[SERVIDOR] Tamanio      10 bytes: 105 intercambios completados.
+[SERVIDOR] Tamanio     100 bytes: 105 intercambios completados.
+[SERVIDOR] Tamanio    1000 bytes: 105 intercambios completados.
+[SERVIDOR] Tamanio   10000 bytes: 105 intercambios completados.
+[SERVIDOR] Tamanio  100000 bytes: 105 intercambios completados.
+[SERVIDOR] Tamanio 1000000 bytes: 105 intercambios completados.
+
+[SERVIDOR] Experimento finalizado.
