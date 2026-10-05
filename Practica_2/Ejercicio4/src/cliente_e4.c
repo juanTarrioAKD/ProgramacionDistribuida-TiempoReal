@@ -111,9 +111,14 @@ int main(int argc, char *argv[]) {
             struct timespec t0_read,  t1_read;
 
             clock_gettime(CLOCK_MONOTONIC, &t0_write);
-            write(sockfd, buffer, tam_buffer);
+            int bytes_enviados = write(sockfd, buffer, tam_buffer);
             clock_gettime(CLOCK_MONOTONIC, &t1_write);
 
+            if (bytes_enviados < 0) { error("Error en write");
+            } else if (bytes_enviados != tam_buffer) {
+                fprintf(stderr, "write parcial: se enviaron %d de %d bytes. "
+                        "Experimento invalidado.\n", bytes_enviados, tam_buffer);
+                exit(1);}
 
             /* ---------- lectura del eco: tam_buffer bytes ----------
                Se cronometra cada read() y luego se suma el tiempo, para asegurarnos de recibir toda la info. */

@@ -96,11 +96,11 @@ int main(int argc, char *argv[]) {
 
             int bytes_enviados = write(sockfd, buffer, tam_buffer);
             
-            if (bytes_enviados < 0) error("Error en write")
-            else if (bytes_enviados != tam_buffer) 
+            if (bytes_enviados < 0) { error("Error en write");
+            } else if (bytes_enviados != tam_buffer) {
                 fprintf(stderr, "write parcial: se enviaron %d de %d bytes. "
                         "Experimento invalidado.\n", bytes_enviados, tam_buffer);
-                exit(1);
+                exit(1);}
         
         }
 
