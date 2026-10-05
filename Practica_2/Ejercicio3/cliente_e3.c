@@ -113,19 +113,22 @@ int main(int argc, char *argv[]) {
             /* ---------- b) lectura del eco: tam_buffer bytes ----------
                Se cronometra el bucle completo: un read() suelto devolveria
                solo los primeros bytes que lleguen, no el eco entero. */
-            clock_gettime(CLOCK_MONOTONIC, &t0_read);
             int bytes_leidos = 0;
+            long long total_tiempo_read=0;
             while (bytes_leidos < tam_buffer) {
+                clock_gettime(CLOCK_MONOTONIC, &t0_read);
                 int n = read(sockfd, buffer_resp + bytes_leidos,
                              tam_buffer - bytes_leidos);
+                clock_gettime(CLOCK_MONOTONIC, &t1_read);
+                total_tiempo_read+=ns_entre(&t1_read,&t0_read);
                 bytes_leidos += n;
             }
-            clock_gettime(CLOCK_MONOTONIC, &t1_read);
+            
 
             if (iter < CALENTAMIENTO) continue;   /* vuelta de calentamiento */
 
             long long ns_write = ns_entre(&t0_write, &t1_write);
-            long long ns_read  = ns_entre(&t0_read,  &t1_read);
+            long long ns_read  = total_tiempo_read;
 
             suma_w += ns_write;
             if (ns_write < min_w) min_w = ns_write;
