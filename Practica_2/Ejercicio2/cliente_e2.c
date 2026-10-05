@@ -103,18 +103,12 @@ int main(int argc, char *argv[]) {
             int bytes_enviados = write(sockfd, buffer, tam_buffer);
             clock_gettime(CLOCK_MONOTONIC, &t1_write);
 
-            if (bytes_enviados < 0) error("Error en write");
+            if (bytes_enviados < 0) error("Error en write")
+            else if (bytes_enviados != tam_buffer) 
+                fprintf(stderr, "write parcial: se enviaron %d de %d bytes. "
+                        "Experimento invalidado.\n", bytes_enviados, tam_buffer);
+                exit(1);
 
-            /* Si write() no entrego todo lo pedido, el resto se manda aca,
-               FUERA de la medicion, para no desincronizar el protocolo. */
-            int offset    = bytes_enviados;
-            int restantes = tam_buffer - bytes_enviados;
-            while (restantes > 0) {
-                int n = write(sockfd, buffer + offset, restantes);
-                if (n < 0) error("Error completando la escritura");
-                offset    += n;
-                restantes -= n;
-            }
 
             /* ---------- b) UNA sola llamada a read(): respuesta del servidor,
                             siempre de la misma cantidad de datos ---------- */
@@ -122,7 +116,8 @@ int main(int argc, char *argv[]) {
             int n_resp = read(sockfd, buffer_resp, 255);
             clock_gettime(CLOCK_MONOTONIC, &t1_read);
 
-            if (n_resp <= 0) error("Error leyendo la respuesta del servidor");
+            if (n_resp <= 0) error("Error leyendo la respuesta del servidor")
+            
 
             if (iter < CALENTAMIENTO) continue;   /* vuelta de calentamiento */
 
