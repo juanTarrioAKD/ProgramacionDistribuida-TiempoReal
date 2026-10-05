@@ -109,14 +109,13 @@ int main(int argc, char *argv[]) {
                         "Experimento invalidado.\n", bytes_enviados, tam_buffer);
                 exit(1);
 
-
             /* ---------- b) UNA sola llamada a read(): respuesta del servidor,
                             siempre de la misma cantidad de datos ---------- */
             clock_gettime(CLOCK_MONOTONIC, &t0_read);
-            int n_resp = read(sockfd, buffer_resp, 255);
+            int bytes_leidos = read(sockfd, buffer_resp, 255);
             clock_gettime(CLOCK_MONOTONIC, &t1_read);
 
-            if (n_resp <= 0) error("Error leyendo la respuesta del servidor")
+            if (bytes_leidos <= 0) error("Error leyendo la respuesta del servidor")
             
 
             if (iter < CALENTAMIENTO) continue;   /* vuelta de calentamiento */
