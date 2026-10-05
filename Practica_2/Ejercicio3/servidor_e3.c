@@ -94,9 +94,13 @@ int main(int argc, char *argv[]) {
                 bytes_leidos += n;
             }
 
-            /* Eco: una sola llamada a write() con los tam_buffer bytes
-               recibidos, igual que el cliente. */
-            write(newsockfd, buffer, tam_buffer);
+            int bytes_enviados = write(sockfd, buffer, tam_buffer);
+            
+            if (bytes_enviados < 0) error("Error en write")
+            else if (bytes_enviados != tam_buffer) 
+                fprintf(stderr, "write parcial: se enviaron %d de %d bytes. "
+                        "Experimento invalidado.\n", bytes_enviados, tam_buffer);
+                exit(1);
         
         }
 
