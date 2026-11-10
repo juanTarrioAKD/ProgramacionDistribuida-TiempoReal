@@ -10,8 +10,7 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 
-/* Estas dos constantes DEBEN coincidir con las del cliente.
-   Si cambias una, cambia la otra o los programas se desincronizan. */
+/* Deben coincidir con las del cliente */
 #define REPETICIONES   100
 #define CALENTAMIENTO    5
 
@@ -26,9 +25,7 @@ int main(int argc, char *argv[]) {
         exit(1);
     }
 
-    /* Arreglo IDENTICO y en el mismo orden que el del cliente: asi ambos
-       saben cuantos bytes corresponden a cada vuelta sin necesidad de
-       negociar nada por la red. */
+    /* Identico y en el mismo orden que el del cliente */
     const int tamanos[] = {10, 100, 1000, 10000, 100000, 1000000};
     const int num_tamanos = 6;
 
@@ -53,8 +50,7 @@ int main(int argc, char *argv[]) {
     printf("[SERVIDOR] Escuchando en el puerto %d...\n", portno);
     fflush(stdout);
 
-    /* El accept() queda FUERA de los bucles: una sola conexion atiende
-       los seis tamanios completos. */
+    /* Una sola conexion atiende los seis tamanios */
     socklen_t clilen = sizeof(cli_addr);
     int newsockfd = accept(sockfd, (struct sockaddr *) &cli_addr, &clilen);
     if (newsockfd < 0) error("Error en accept");
@@ -64,7 +60,6 @@ int main(int argc, char *argv[]) {
            REPETICIONES, CALENTAMIENTO);
     fflush(stdout);
 
-    /* Buffer reservado UNA sola vez, del tamanio mayor */
     int max_tam = tamanos[num_tamanos - 1];
     char *buffer = (char *) malloc(max_tam);
     if (buffer == NULL) error("Error al reservar memoria");
@@ -75,11 +70,7 @@ int main(int argc, char *argv[]) {
 
         for (int iter = 0; iter < CALENTAMIENTO + REPETICIONES; iter++) {
 
-            /* read() devuelve "lo que haya disponible", no necesariamente
-               todo lo pedido. Con 10^5 y 10^6 bytes es practicamente seguro
-               que haga falta insistir, asi que se lee en bucle hasta juntar
-               los tam_buffer bytes. Sin esto el protocolo se desfasa en la
-               vuelta siguiente. */
+            /* read() puede devolver menos de lo pedido: se lee hasta completar */
             int bytes_leidos = 0;
             while (bytes_leidos < tam_buffer) {
                 int n = read(newsockfd, buffer + bytes_leidos,
@@ -94,14 +85,14 @@ int main(int argc, char *argv[]) {
                 bytes_leidos += n;
             }
 
-            int bytes_enviados = write(sockfd, buffer, tam_buffer);
-            
+            int bytes_enviados = write(newsockfd, buffer, tam_buffer);
+
             if (bytes_enviados < 0) { error("Error en write");
             } else if (bytes_enviados != tam_buffer) {
                 fprintf(stderr, "write parcial: se enviaron %d de %d bytes. "
                         "Experimento invalidado.\n", bytes_enviados, tam_buffer);
                 exit(1);}
-        
+
         }
 
         printf("[SERVIDOR] Tamanio %7d bytes: %d intercambios completados.\n",
